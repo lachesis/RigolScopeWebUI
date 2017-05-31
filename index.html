@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><title>Rigol Scope Manager</title>
+<style>
+#cmd-form {
+  margin-top: 0.5em;
+}
+</style>
+</head><body>
+<div id="connected-div">Not Connected</div>
+<form id="connect-form" action="/connect" method="POST">
+  <input name="ip" type="text" placeholder="192.168.60.198" />
+  <input name="port" type="text" placeholder="5555" />
+  <input type="submit" />
+</form>
+<br>
+<div id="after-connect" style="display:none;">
+<img id="screen-img" src="#" />
+<form id="cmd-form" action="/cmd" method="POST">
+  <input name="cmd" type="text" />
+  <label>Expect output? <input name="expect_output" type="checkbox" /></label>
+  <input type="submit" />
+</form>
+<pre id="cmd-output"></pre>
+<a target="_blank" href="http://int.rigol.com/File/TechDoc/20151218/MSO1000Z&DS1000Z_ProgrammingGuide_EN.pdf">Programming Guide</a>
+</div>
+<script type="text/javascript">
+  var imageInterval = null;
+
+  function checkConnection() {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener("load", (evt)=>{
+      if(evt.target.responseText == 'true') {
+        document.querySelector('#connected-div').innerHTML = 'Connected';
+        document.querySelector('#after-connect').style.display = '';
+        document.querySelector('#screen-img').src = '/screen';
+        if(!imageInterval)
+          imageInterval = window.setInterval(refreshScreen, 5000);
+      } else {
+        document.querySelector('#connected-div').innerHTML = 'Not Connected';
+        document.querySelector('#after-connect').style.display = 'none';
+        imageInterval && window.clearInterval(imageInterval);
+        imageInterval = null;
+      }
+    });
+    xhr.open("GET", "/connect");
+    xhr.send();
+  }
+
+  function refreshScreen() {
+    document.querySelector('#screen-img').src = '/screen?t=' + new Date();
+  }
+
+  function sendCommand(cmd, expectOutput) {
+    if (cmd) {
+      var xhr = new XMLHttpRequest();
+      xhr.addEventListener("load", (evt)=>{
+        refreshScreen();
+        document.querySelector('#cmd-output').innerHTML = evt.target.responseText;
+      });
+      xhr.open("POST", "/cmd");
+      xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      xhr.send("cmd=" + escape(cmd) + '&expect_output=' + (expectOutput && 'true' || 'false'));
+    }
+  }
+
+  checkConnection();
+  document.querySelector('#cmd-form').onsubmit = (evt)=>{
+    document.querySelector('#cmd-output').innerHTML = "";
+    var cmd = evt.target.cmd.value;
+    var expectOutput = evt.target.expect_output.checked;
+    sendCommand(cmd, expectOutput);
+    return false;
+  };
+  document.querySelector('#connect-form').onsubmit = (evt)=>{
+    var ip = evt.target.ip.value;
+    var port = evt.target.port.value;
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener("load", (evt)=>{
+      checkConnection();
+    });
+    xhr.open("POST", "/connect");
+    xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xhr.send("ip=" + escape(ip) + '&port=' + escape(port));
+    return false;
+  }
+</script>
+</body></html>
